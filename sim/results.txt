@@ -1,0 +1,6 @@
+Expected waveform summary (100MHz clock, 10ns period):
+- During active-low reset: pulse=0, busy=0.
+- width=1, period=2, enable=1: pulse alternates high/low every clock (10ns high, 10ns low), busy=1.
+- enable->0: pulse drops to 0 immediately on next clock, busy=0, counter resets.
+- width=255, period=65535, enable=1: pulse high for 255 cycles (2.55us), then low for 65280 cycles (652.8us), repeating.
+- Reassert reset during run: pulse=0, busy=0, generation restarts from cycle 0 when enabled again.
