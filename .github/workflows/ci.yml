@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog verilator
+          python -m pip install --upgrade pip
+          python -m pip install matplotlib
+
+      - name: Run pulse_gen testbench
+        run: |
+          mkdir -p build
+          iverilog -g2012 -o build/tb_pulse_gen.vvp rtl/pulse_gen.sv sim/tb_pulse_gen.sv
+          vvp build/tb_pulse_gen.vvp
+
+      - name: Run multi-channel testbench
+        run: |
+          mkdir -p build
+          iverilog -g2012 -o build/tb_multi_pulse_gen.vvp rtl/pulse_gen.sv rtl/multi_pulse_gen.sv sim/tb_multi_pulse_gen.sv
+          vvp build/tb_multi_pulse_gen.vvp
+
+      - name: Generate waveform
+        run: |
+          python scripts/generate_waveform.py
+
+      - name: Upload waveform artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: waveform
+          path: docs/waveform.png
+
+      - name: Lint RTL
+        run: |
+          verilator --lint-only --sv --Wall -Wno-fatal rtl/pulse_gen.sv rtl/multi_pulse_gen.sv
