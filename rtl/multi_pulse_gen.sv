@@ -46,7 +46,7 @@ module multi_pulse_gen #(
                 enable_reg[i] <= 1'b0;
             end
         end else if (wr_en && (channel_sel < NUM_CHANNELS)) begin
-            unique case (addr)
+            case (addr)
                 2'd0: width_reg[channel_sel]  <= wr_data[WIDTH_BITS-1:0];
                 2'd1: period_reg[channel_sel] <= wr_data[PERIOD_BITS-1:0];
                 2'd2: enable_reg[channel_sel] <= wr_data[0];
@@ -60,7 +60,7 @@ module multi_pulse_gen #(
     always_comb begin
         rd_data = '0;
         if (channel_sel < NUM_CHANNELS) begin
-            unique case (addr)
+            case (addr)
                 2'd0: rd_data = {{(DATA_BITS-WIDTH_BITS){1'b0}}, width_reg[channel_sel]};
                 2'd1: rd_data = {{(DATA_BITS-PERIOD_BITS){1'b0}}, period_reg[channel_sel]};
                 2'd2: rd_data = '0;

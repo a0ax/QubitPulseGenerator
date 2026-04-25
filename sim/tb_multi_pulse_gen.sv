@@ -69,6 +69,18 @@ module tb_multi_pulse_gen;
         end
     endtask
 
+    task automatic model_step;
+        for (int i = 0; i < NUM_CHANNELS; i++) begin
+            if (!rst_n || !model_enable[i] || (model_width[i] == 0) || (model_period[i] == 0)) begin
+                model_count[i] = 0;
+            end else if (model_count[i] == (model_period[i] - 1)) begin
+                model_count[i] = 0;
+            end else begin
+                model_count[i]++;
+            end
+        end
+    endtask
+
     task automatic expect_bit(input string tag, input bit got, input bit exp);
         if (got !== exp) begin
             $error("%s mismatch: got=%0b exp=%0b at t=%0t", tag, got, exp, $time);
@@ -92,6 +104,7 @@ module tb_multi_pulse_gen;
         @(posedge clk);
         #1;
         wr_en = 1'b0;
+        model_step();
         case (reg_addr)
             2'd0: model_width[ch] = data[WIDTH_BITS-1:0];
             2'd1: model_period[ch] = data[PERIOD_BITS-1:0];
@@ -108,6 +121,7 @@ module tb_multi_pulse_gen;
         addr = reg_addr;
         wr_en = 1'b0;
         wr_data = '0;
+        model_step();
         #1;
         expect_data(tag, rd_data, exp);
         reads_run++;
@@ -126,22 +140,17 @@ module tb_multi_pulse_gen;
 
             if (!rst_n || !model_enable[i] || (model_width[i] == 0) || (model_period[i] == 0)) begin
                 exp_pulse = 1'b0;
-                model_count[i] = 0;
             end else begin
                 width_eff = min_unsigned(model_width[i], model_period[i]);
                 exp_pulse = (model_count[i] < width_eff);
                 expected_busy = 1'b1;
-
-                if (model_count[i] == (model_period[i] - 1))
-                    model_count[i] = 0;
-                else
-                    model_count[i]++;
             end
 
             expect_bit({tag, " ", channel_name(i), " pulse"}, pulse_out[i], exp_pulse);
         end
 
         expect_bit({tag, " busy"}, busy, expected_busy);
+        model_step();
         checks_run++;
     endtask
 
