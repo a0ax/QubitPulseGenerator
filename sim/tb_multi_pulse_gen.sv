@@ -121,7 +121,6 @@ module tb_multi_pulse_gen;
         addr = reg_addr;
         wr_en = 1'b0;
         wr_data = '0;
-        model_step();
         #1;
         expect_data(tag, rd_data, exp);
         reads_run++;
