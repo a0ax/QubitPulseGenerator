@@ -25,6 +25,8 @@ module tb_multi_pulse_gen;
     int unsigned model_period [NUM_CHANNELS];
     int unsigned model_count [NUM_CHANNELS];
     bit model_enable [NUM_CHANNELS];
+    bit model_pulse [NUM_CHANNELS];
+    bit model_busy [NUM_CHANNELS];
 
     multi_pulse_gen #(
         .WIDTH_BITS(WIDTH_BITS),
@@ -66,20 +68,37 @@ module tb_multi_pulse_gen;
             model_period[i] = 0;
             model_count[i] = 0;
             model_enable[i] = 0;
+            model_pulse[i] = 0;
+            model_busy[i] = 0;
         end
     endtask
 
-    task automatic model_step;
-        for (int i = 0; i < NUM_CHANNELS; i++) begin
-            if (!rst_n || !model_enable[i] || (model_width[i] == 0) || (model_period[i] == 0)) begin
-                model_count[i] = 0;
-            end else if (model_count[i] == (model_period[i] - 1)) begin
-                model_count[i] = 0;
-            end else begin
-                model_count[i]++;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            for (int i = 0; i < NUM_CHANNELS; i++) begin
+                model_count[i] <= 0;
+                model_pulse[i] <= 0;
+                model_busy[i] <= 0;
+            end
+        end else begin
+            for (int i = 0; i < NUM_CHANNELS; i++) begin
+                int unsigned width_eff_local;
+                if (!model_enable[i] || (model_width[i] == 0) || (model_period[i] == 0)) begin
+                    model_count[i] <= 0;
+                    model_pulse[i] <= 0;
+                    model_busy[i] <= 0;
+                end else begin
+                    width_eff_local = min_unsigned(model_width[i], model_period[i]);
+                    model_pulse[i] <= (model_count[i] < width_eff_local);
+                    model_busy[i] <= 1;
+                    if (model_count[i] == (model_period[i] - 1))
+                        model_count[i] <= 0;
+                    else
+                        model_count[i] <= model_count[i] + 1;
+                end
             end
         end
-    endtask
+    end
 
     task automatic expect_bit(input string tag, input bit got, input bit exp);
         if (got !== exp) begin
@@ -104,7 +123,6 @@ module tb_multi_pulse_gen;
         @(posedge clk);
         #1;
         wr_en = 1'b0;
-        model_step();
         case (reg_addr)
             2'd0: model_width[ch] = data[WIDTH_BITS-1:0];
             2'd1: model_period[ch] = data[PERIOD_BITS-1:0];
@@ -127,29 +145,14 @@ module tb_multi_pulse_gen;
     endtask
 
     task automatic step_and_check(input string tag);
-        bit expected_busy;
-
         @(posedge clk);
         #1;
-        expected_busy = 1'b0;
 
         for (int i = 0; i < NUM_CHANNELS; i++) begin
-            bit exp_pulse;
-            int unsigned width_eff;
-
-            if (!rst_n || !model_enable[i] || (model_width[i] == 0) || (model_period[i] == 0)) begin
-                exp_pulse = 1'b0;
-            end else begin
-                width_eff = min_unsigned(model_width[i], model_period[i]);
-                exp_pulse = (model_count[i] < width_eff);
-                expected_busy = 1'b1;
-            end
-
-            expect_bit({tag, " ", channel_name(i), " pulse"}, pulse_out[i], exp_pulse);
+            expect_bit({tag, " ", channel_name(i), " pulse"}, pulse_out[i], model_pulse[i]);
         end
 
-        expect_bit({tag, " busy"}, busy, expected_busy);
-        model_step();
+        expect_bit({tag, " busy"}, busy, (|model_busy));
         checks_run++;
     endtask
 
