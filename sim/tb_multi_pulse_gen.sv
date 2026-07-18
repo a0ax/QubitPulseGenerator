@@ -145,14 +145,18 @@ module tb_multi_pulse_gen;
     endtask
 
     task automatic step_and_check(input string tag);
+        bit expected_busy;
+
         @(posedge clk);
         #1;
+        expected_busy = 1'b0;
 
         for (int i = 0; i < NUM_CHANNELS; i++) begin
             expect_bit({tag, " ", channel_name(i), " pulse"}, pulse_out[i], model_pulse[i]);
+            expected_busy |= model_busy[i];
         end
 
-        expect_bit({tag, " busy"}, busy, (|model_busy));
+        expect_bit({tag, " busy"}, busy, expected_busy);
         checks_run++;
     endtask
 
